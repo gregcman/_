@@ -1,0 +1,2 @@
+(defpackage #:terminal625
+  (:use #:cl))

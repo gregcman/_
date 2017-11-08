@@ -1,5 +1,6 @@
 (asdf:defsystem #:terminal625
-  :depends-on ()
+  :depends-on (:uiop
+	       :swank)
   :serial t
   :components
   

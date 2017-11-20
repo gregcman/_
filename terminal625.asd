@@ -1,8 +1,8 @@
 (asdf:defsystem #:terminal625
-  :depends-on (:uiop
-	       :swank)
+  :depends-on ()
   :serial t
   :components
   
-  ((:file "terminal625")))
+  ((:file "terminal625")
+   (:file "vm")))
 

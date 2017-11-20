@@ -1,0 +1,60 @@
+(in-package :terminal625)
+
+;;;can jump to any point in the function
+;;;each evaluation can be interrupted and resumed
+(defparameter *arr* (make-array 128))
+
+
+(defun quadratic-formula (a b c)
+  (let ((det (sqrt (- (* b b)
+		      (* 4 a c))))
+	(denominator (* 2 a))
+	(minus-b (- b)))
+    (values
+     (/ (+ minus-b det) denominator)
+     (/ (- minus-b det) denominator))))
+
+;;;(x - 6) * (7x - 7) = 0
+;;;7x^2 - 7x + 42 - 42x
+;;;7x^2 - 49x + 42
+#+nil
+(let*
+    let
+
+  quote
+  eval-when
+  load-time-value
+  symbol-macrolet
+  locally
+  macrolet
+  the
+
+  tagbody
+  go
+
+  flet
+  labels
+
+  block
+  return-from
+
+  catch
+  throw
+
+  unwind-protect
+
+  setq
+
+  function
+  multiple-value-call
+  multiple-value-prog1
+
+  if
+  progn)
+
+;;let let* if progn setq catch throw unwind-protect block return-from go tagbody quote
+
+;;multiple values?
+;;macros?
+;;closures??
+

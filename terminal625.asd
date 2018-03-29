@@ -3,6 +3,5 @@
   :serial t
   :components
   
-  ((:file "terminal625")
-   (:file "vm")))
+  ((:file "vm")))
 

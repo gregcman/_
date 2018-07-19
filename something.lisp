@@ -31,21 +31,30 @@
 
 ;;;;there are no symbols.
 
-(cons (se1) (se2) next)
+;;;;is "cons" really necessary? what if there was an [infinite?]
+;;;;list of cons cells that
+;;;;already existed, and you just use that instead?
+;;;;(cons (se1) (se2) next)
 
 ;;;;if arg1 and arg2 are the same reference and not flipped relative to each
 ;;;;other, execute next-same. otherwise execute next-different.
 (test (arg1) (arg2) next-same next-different)
 
 ;;;;copy car of source into the car of destination
-(move destination source next)
+;;;;(move destination source next)
 
-(move (...) (foo) ...) -> (move (foo) (foo) ...)
+;;;;(move (...) (foo) ...) -> (move (foo) (foo) ...)
 
 ;;;;flip value in-place.
-(flip (value) next)
+;;;;(flip (value) next)
 
-(flip (<... ...}) ...) -> (flip ({... ...>) ...)
+;;;;(flip (<... ...}) ...) -> (flip ({... ...>) ...)
+
+;;;;moveflip operator is the only one that can
+;;;;change state.
+(moveflip destination source next)
+
+(moveflip (...) (<foo}) ...) -> (move ({oof>) (<foo}) ...)
 
 ;;;;flip toggles the direction of the cell on each invocation.
 
@@ -64,3 +73,8 @@
 
 
 ;;;;could this lisp run in a limited environment? like dna?
+
+;;;;test -> branches
+;;;;move -> state
+;;;;flip -> two sides of cons cell, also state?
+;;;;fork -> concurrency

@@ -40,13 +40,13 @@
 ;;;;other, execute next-same. otherwise execute next-different.
 (test (arg1) (arg2) next-same next-different)
 
-;;;;copy car of source into the car of destination
-;;;;(move destination source next)
+;;;;replace destination with value
+(move (destination) (value) next)
 
 (move (...) (foo) ...) -> (move (foo) (foo) ...)
 
 ;;;;flip value in-place.
-;;;;(flip (value) next)
+(flip (value) next)
 
 (flip (<... ...}) ...) -> (flip ({... ...>) ...)
 
@@ -75,14 +75,32 @@
 
 ;;;;moveflip operator is the only one that can
 ;;;;change state.
-(moveflip (destination . source) next)
+(moveflip ((destination) . (source))
+	  next)
 
 (moveflip ((...) . (<foo})) ...) -> (moveflip (({oof>) . (<foo})) ...)
-;;;;if arg1 and arg2 are the same reference execute next-same.
-;;;;otherwise execute next-different.
-;;;;flipped versions of themselves do both,
-(forktest (arg1) (arg2) next-same next-different)
 
-;;;;forktest -> branches, concurrency
-;;;;moveflip -> state, two sides of cons cell
+;;;;if arg1 and arg2 are:
+;;;; -flipped versions of the same reference execute next-same and next-different
+;;;;  concurrently.
+;;;; -identical execute next-same
+;;;; -not identical and not flipped versions execute next-different.
+(forktest ((arg1) . (arg2))
+	  (next-same . next-different))
 
+;;;;forktest -> concurrency
+;;;;moveflip -> state
+
+;;;below (a b) == (a . b) in regular lisp
+
+(moveflip ;;instruction name
+ (((destination ?)
+   (source ?))
+  (next
+   ?)))
+
+(forktest
+ (((arg1 ?)
+   (arg2 ?))
+  (next-same
+   next-different)))

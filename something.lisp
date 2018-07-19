@@ -105,12 +105,25 @@
   (next-same
    next-different)))
 
+;;;;- Tuples are the only data type.
+;;;;- Tuples holds references to two other tuples.
+;;;;- The reference to a tuple can be in either of two states.
+;;;;  The "back" of one reference might be the "front" of another.
+
+;;;;notation:
+;;;;(a b)
+;;;;"(" marks the "front" of the tuple
+;;;;")" marks the "back" of the tuple
+;;;;every continuous block of non-whitespace or "(" or ")"
+;;;;are just references to other tuples. In this case, "a" and "b" are
+;;;;just other tuples.
+
 ;;;;one mega-instruction:
 ;;;;- replace "to" with the flipped value of "from"
 ;;;;- compare arg0 and arg1:
 ;;;; - when identical, execute next-same
 ;;;; - when one is the flipped version of the other,
-;;;;   execute next-same and next-different
+;;;;   execute next-same and next-different concurrently
 ;;;; - otherwise execute next-different
 ((((to ?)
    (from ?))

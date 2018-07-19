@@ -104,3 +104,17 @@
    (arg2 ?))
   (next-same
    next-different)))
+
+;;;;one mega-instruction:
+;;;;- replace "to" with the flipped value of "from"
+;;;;- compare arg0 and arg1:
+;;;; - when identical, execute next-same
+;;;; - when one is the flipped version of the other,
+;;;;   execute next-same and next-different
+;;;; - otherwise execute next-different
+((((to ?)
+   (from ?))
+  ((arg0 ?)
+   (arg1 ?)))
+ ((next-same ?)
+  (next-different ?)))

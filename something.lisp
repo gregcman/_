@@ -50,13 +50,13 @@
 
 ;;;;(flip (<... ...}) ...) -> (flip ({... ...>) ...)
 
+;;;;flip toggles the direction of the cell on each invocation.
+
 ;;;;moveflip operator is the only one that can
 ;;;;change state.
-(moveflip destination source next)
+(moveflip (destination . source) next)
 
-(moveflip (...) (<foo}) ...) -> (move ({oof>) (<foo}) ...)
-
-;;;;flip toggles the direction of the cell on each invocation.
+(moveflip ((...) . (<foo})) ...) -> (moveflip (({oof>) . (<foo})) ...)
 
 ;;;;on the necessity of "fork":
 ;;;;each instruction could potentially trigger more
@@ -77,4 +77,8 @@
 ;;;;test -> branches
 ;;;;move -> state
 ;;;;flip -> two sides of cons cell, also state?
+;;;;fork -> concurrency
+
+;;;;test -> branches
+;;;;moveflip -> state, two sides of cons cell
 ;;;;fork -> concurrency

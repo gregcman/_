@@ -43,20 +43,14 @@
 ;;;;copy car of source into the car of destination
 ;;;;(move destination source next)
 
-;;;;(move (...) (foo) ...) -> (move (foo) (foo) ...)
+(move (...) (foo) ...) -> (move (foo) (foo) ...)
 
 ;;;;flip value in-place.
 ;;;;(flip (value) next)
 
-;;;;(flip (<... ...}) ...) -> (flip ({... ...>) ...)
+(flip (<... ...}) ...) -> (flip ({... ...>) ...)
 
 ;;;;flip toggles the direction of the cell on each invocation.
-
-;;;;moveflip operator is the only one that can
-;;;;change state.
-(moveflip (destination . source) next)
-
-(moveflip ((...) . (<foo})) ...) -> (moveflip (({oof>) . (<foo})) ...)
 
 ;;;;on the necessity of "fork":
 ;;;;each instruction could potentially trigger more
@@ -70,8 +64,6 @@
 ;;;;relative to the other evaluators.
 ;;;;(halt)
 
-
-
 ;;;;could this lisp run in a limited environment? like dna?
 
 ;;;;test -> branches
@@ -79,6 +71,18 @@
 ;;;;flip -> two sides of cons cell, also state?
 ;;;;fork -> concurrency
 
-;;;;test -> branches
+;;;;
+
+;;;;moveflip operator is the only one that can
+;;;;change state.
+(moveflip (destination . source) next)
+
+(moveflip ((...) . (<foo})) ...) -> (moveflip (({oof>) . (<foo})) ...)
+;;;;if arg1 and arg2 are the same reference execute next-same.
+;;;;otherwise execute next-different.
+;;;;flipped versions of themselves do both,
+(forktest (arg1) (arg2) next-same next-different)
+
+;;;;forktest -> branches, concurrency
 ;;;;moveflip -> state, two sides of cons cell
-;;;;fork -> concurrency
+

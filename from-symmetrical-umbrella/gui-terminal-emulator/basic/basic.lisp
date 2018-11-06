@@ -25,7 +25,7 @@
    :width (* 80 8)
    :height (* 25 16)
    :title "a basic app"))
-(defvar *this-directory* (filesystem-util:this-directory))
+(defvar *this-directory* (asdf:system-source-directory :basic))
 
 (defclass sprite ()
   ((bounding-box :accessor sprite.bounding-box
@@ -349,7 +349,7 @@
 
 (deflazy cons-png ()
   (image-utility:read-png-file
-   (filesystem-util:rebase-path #P"cons-cell.png" *this-directory*)
+   (utility:rebase-path #P"cons-cell.png" *this-directory*)
    t))
 (deflazy cons-texture (cons-png gl-context)
   (make-instance

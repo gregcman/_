@@ -4,83 +4,133 @@
 (in-package :lem-opengl-font)
 
 
-(defparameter *face*
-  (case 0
-    (0 '("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
-	 "/usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf"))
-    (1 '("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-	 "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"))))
+(defparameter *face-path*
+  (first
+   (case 1
+     (0 '("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
+	  "/usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf"))
+     (1 '("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+	  "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf")))))
+
+(defparameter *freetype-face-object* nil)
+
+(defmacro with-face (&body body)
+  `(freetype2:with-open-face (*freetype-face-object* *face-path*)
+     ,@body))
 
 (defun power-of-2-ceiling (n)
   (ash 1 (ceiling (log n 2))))
 
+(defun test420 ()
+  (with-face
+    (multiple-value-bind (pt height) (find-max-height-points)
+      (set-size pt)
+      ;;the last value of char
+      (setf height (power-of-2-ceiling height))
+      (opticl:write-png-file
+       "/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/unused/test/font.png"
+       (let ((width
+	      (power-of-2-ceiling
+	       (ceiling (freetype2::string-pixel-width *freetype-face-object*  "█"))))
+	     (grid-x 16)
+	     (grid-y 8))
+	 (let* ((raster-array-height (* grid-y height))
+		(raster-array-width (* grid-x width)))
+	   ;;     (print (list width height))
+      ;;;;allocate the array to store the pixel data
+	   (let ((raster-array (make-array (list raster-array-height
+						 raster-array-width
+						 4)
+					   :element-type '(unsigned-byte 8)
+					   :initial-element 0)))
+	     (draw-to-array raster-array grid-x grid-y width height 0 0)
+	     (draw-to-array raster-array grid-x grid-y width height 0 0 :underline-p t)
+	     ;;	(print raster-array)
+	     raster-array)))))))
 
-(defun test78 (&optional (path (second *face*)))
-  (freetype2:with-open-face (face
-			     path)
-    (let ((char-width 0)
-	  ;; (char-height 16)
-	  (last-height nil)
-	  (height 0)
-	  (max-height 16))
-      (flet ((set-size (n)
-	       (freetype2:set-char-size face
-					(* n 64) 0 ;;(* char-height 64)
-					64
-					64
-					)))
-	(block out
-	  (loop
-	     (set-size char-width)
-	     (let ((new-height
-		    (power-of-2-ceiling (ceiling (freetype2::string-pixel-height face "█")))))
-	       (when (> new-height max-height)
-		 (set-size (- char-width 1))
-		 (setf height last-height)
-		 (return-from out))
-	       (incf char-width)
-	       (print char-width)
-	       (setf last-height new-height)))))
-      (let* ((width (power-of-2-ceiling (ceiling (freetype2::string-pixel-width face  "█"))))
-	     (raster-array-height (* 16 height))
-	     (raster-array-width (* 16 width)))
-	(print (list width height))
-	(let ((raster-array (make-array (list raster-array-height
-					      raster-array-width
-					      4)
-					:element-type '(unsigned-byte 8))))
-	  ;;	(print raster-array)
-	  (utility:dobox
-	   ((char 0 256))
-	   (multiple-value-bind (array xoffset yoffset)
-	       (toy-string-to-array face (string (code-char char)))
-	     ;;   (print char)
-	     ;;   (print (list xoffset yoffset array))
-	     (multiple-value-bind (ybase xbase) (floor char 16)
-	       (setf xbase (* xbase width)
-		     ybase (* ybase height))
-	       (incf xbase xoffset)
-	       (incf ybase yoffset)
-	       (destructuring-bind (sub-height sub-width) (array-dimensions array)
-		 (utility::dobox
-		  ((y 0 sub-height)
-		   (x 0 sub-width))
-		  (let ((ax (+ x xbase))
-			(ay (+ y ybase))
-			(ans (aref array y x)))
-		    ;;  (print (list x y))
-		    (if (and (> raster-array-height ay -1)
-			     (> raster-array-width ax -1))
-			(dotimes (channel 4)
-			  (setf (aref raster-array
-				      ay
-				      ax
-				      channel)
-				ans))
-			(print "out of bounds"))))))))
-	  (opticl:write-png-file
-	   "/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/unused/test/font.png"
-	   raster-array))))))
+(defun set-size (n &optional (face *freetype-face-object*))
+  (freetype2:set-char-size face
+			   (* n 64) 0 ;;(* char-height 64)
+			   64
+			   64
+			   ))
+
+(defun find-max-height-points (&optional (max-height 16) (face *freetype-face-object*))
+  "find the maximum size font that fits under max-height pixels. 
+fonts are generally taller than they are wide. Return (values pt height)"
+  (let ((char-width 0)
+	;; (char-height 16)
+	(last-height nil)
+	(last-char-width nil))
+    (block out
+      (loop
+	 (set-size char-width face)
+	 (let ((new-height
+		(ceiling (freetype2::string-pixel-height face "█"))))
+	   (when (> new-height max-height)
+	     (return-from out))
+	   (incf char-width)
+	   ;;(print char-width)
+	   (setf last-height new-height
+		 last-char-width char-width))))
+    (values last-char-width
+	    last-height)))
+
+(defun legit-array-index (array &rest indices)
+  (block out
+    (mapc (lambda (max value)
+	    (unless (> max value -1)
+	      (return-from out nil)))
+	  (array-dimensions array)
+	  indices)
+    t))
+
+;;grid-x and grid-y are the size in charactesr of the grid
+;;width and height are size of individual texture in pixels
+(defun draw-to-array
+    (raster-array
+     grid-x grid-y
+     width height
+     char-x-offset char-y-offset
+     &key (face *freetype-face-object*) underline-p)
+  (utility:dobox
+   ((char 0 (* grid-x grid-y)))
+   (multiple-value-bind (array xoffset yoffset)
+       (toy-string-to-array face
+			    (if underline-p
+				"_" ;;draw an underline for underline font			     
+				(string
+				 (code-char 
+				  char))))
+     ;;   (print char)
+     ;;   (print (list xoffset yoffset array))
+     (multiple-value-bind (ybase xbase) (floor char grid-x)
+       (setf xbase (* xbase width)
+	     ybase (* ybase height))
+       (incf xbase xoffset)
+       (incf ybase yoffset)
+       (incf xbase (* char-x-offset width))
+       (incf ybase (* char-y-offset height))
+       (destructuring-bind (sub-height sub-width) (array-dimensions array)
+	 (utility::dobox
+	  ((y 0 sub-height)
+	   (x 0 sub-width))
+	  (let ((ax (+ x xbase))
+		(ay (+ y ybase))
+		(ans (aref array y x)))
+	    ;;  (print (list x y))
+	    (if (legit-array-index raster-array ay ax)
+		(dotimes (channel 4)
+		  (setf (aref raster-array
+			      ay
+			      ax
+			      channel)
+			
+			ans
+			;;(- 255 ans)
+			))
+		;;	(print "out of bounds")
+		))))))))
 
 ;;"ii██"
 ;;"ii██"
@@ -89,7 +139,7 @@
 
 (defun toy-string-to-array (face string)
   (let (ans xans yans)
-    (freetype2:do-string-render (face string bitmap x y)
+    (freetype2:do-string-render (face string bitmap x y :baseline-y-p nil :offsets-p nil)
       (setf (values ans xans yans)
 	    (values
 	     (bitmap-to-array bitmap) x y)))

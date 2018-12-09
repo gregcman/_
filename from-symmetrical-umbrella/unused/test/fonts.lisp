@@ -5,76 +5,85 @@
 
 
 (defparameter *face-path*
-  (first
-   (case 1
-     (0 '("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
-	  "/usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf"))
-     (1 '("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-	  "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf")))))
+  #+nil
+  '("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
+    "/usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf")
+  '("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"))
 
 (defparameter *freetype-face-object* nil)
 
-(defmacro with-face (&body body)
-  `(freetype2:with-open-face (*freetype-face-object* *face-path*)
+(defmacro with-face ((face-path) &body body)
+  `(freetype2:with-open-face (*freetype-face-object* ,face-path)
      ,@body))
 
 (defun power-of-2-ceiling (n)
   (ash 1 (ceiling (log n 2))))
 
-(defun test420 ()
-  (with-face
-    (multiple-value-bind (pt height) (find-max-height-points)
-      (set-size pt)
-      ;;the last value of char
-      (setf height (power-of-2-ceiling height))
-      (opticl:write-png-file
-       "/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/unused/test/font.png"
-       (let ((width
-	      (power-of-2-ceiling
-	       (ceiling (freetype2::string-pixel-width *freetype-face-object*  "█"))))
-	     (grid-x 16)
-	     (grid-y 8))
-	 (let* ((raster-array-height (* grid-y height))
-		(raster-array-width (* grid-x width)))
-	   ;;     (print (list width height))
-      ;;;;allocate the array to store the pixel data
-	   (let ((raster-array (make-array (list raster-array-height
-						 raster-array-width
-						 4)
-					   :element-type '(unsigned-byte 8)
-					   :initial-element 0)))
-	     (draw-to-array raster-array grid-x grid-y width height 0 0)
-	     (draw-to-array raster-array grid-x grid-y width height 0 0 :underline-p t)
-	     ;;	(print raster-array)
-	     raster-array)))))))
+(defun setpt-helper (max-height &optional (face *freetype-face-object*))
+  (multiple-value-bind (pt width) (find-max-width-points max-height face)
+    (set-size pt 1)
+    (let ((height (ceiling (freetype2::string-pixel-height *freetype-face-object*  "█"))))
+      (values pt height width))))
 
-(defun set-size (n &optional (face *freetype-face-object*))
+(defun dump-font ()
+  (apply 'test420 (append *face-path* (list 8))))
+
+(defun test420 (regular-path bold-path glyph-height)
+  (setf glyph-height (power-of-2-ceiling glyph-height))
+  (with-face (regular-path)
+    (multiple-value-bind (pt height width) (setpt-helper glyph-height)
+      (setf height (power-of-2-ceiling height)
+	    width (* 2 (power-of-2-ceiling width)))
+      (let* ((ratio (/ height width))
+	     (grid-x 16)
+	     (grid-y 8)
+	     (raster-array (make-array (list (* 2 grid-y height)
+					     (* 2 grid-x width)
+					     4)
+				       :element-type '(unsigned-byte 8)
+				       :initial-element 0)))
+	(set-size pt ratio)
+	(draw-to-array raster-array grid-x grid-y width height 0 0)
+	(draw-to-array raster-array grid-x grid-y width height grid-x 0)
+	(draw-to-array raster-array grid-x grid-y width height grid-x 0 :underline-p t)
+
+	(with-face (bold-path)
+	  (set-size pt ratio)
+	  (draw-to-array raster-array grid-x grid-y width height 0 grid-y)
+	  (draw-to-array raster-array grid-x grid-y width height grid-x grid-y)
+	  (draw-to-array raster-array grid-x grid-y width height grid-x grid-y :underline-p t))
+	(opticl:write-png-file
+	 "/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/unused/test/font.png"      	 
+	 raster-array)))))
+
+(defun set-size (n scale &optional (face *freetype-face-object*))
   (freetype2:set-char-size face
-			   (* n 64) 0 ;;(* char-height 64)
+			   (* n 64) 0
 			   64
-			   64
+			   (* 64 scale)
 			   ))
 
-(defun find-max-height-points (&optional (max-height 16) (face *freetype-face-object*))
-  "find the maximum size font that fits under max-height pixels. 
+(defun find-max-width-points (&optional (max-width 16) (face *freetype-face-object*))
+  "find the maximum size font that fits under max-width pixels. 
 fonts are generally taller than they are wide. Return (values pt height)"
-  (let ((char-width 0)
+  (let ((pt 0)
 	;; (char-height 16)
-	(last-height nil)
-	(last-char-width nil))
+	(last-width nil)
+	(last-pt nil))
     (block out
       (loop
-	 (set-size char-width face)
-	 (let ((new-height
-		(ceiling (freetype2::string-pixel-height face "█"))))
-	   (when (> new-height max-height)
+	 (set-size pt 1 face)
+	 (let ((new-width
+		(ceiling (freetype2::string-pixel-width face "█"))))
+	   (when (> new-width max-width)
 	     (return-from out))
-	   (incf char-width)
+	   (incf pt)
 	   ;;(print char-width)
-	   (setf last-height new-height
-		 last-char-width char-width))))
-    (values last-char-width
-	    last-height)))
+	   (setf last-width new-width
+		 last-pt pt))))
+    (values last-pt
+	    last-width)))
 
 (defun legit-array-index (array &rest indices)
   (block out

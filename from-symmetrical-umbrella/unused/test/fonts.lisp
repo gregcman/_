@@ -1,54 +1,90 @@
-(in-package z:sandbox)
+(defpackage #:lem-opengl-font
+  (:use :cl))
 
-(progno
- #:cl-freetype2)
-(progno
- (:file "fonts"))
+(in-package :lem-opengl-font)
+
+
 (defparameter *face*
-  (freetype2:new-face
-   (case 1
-     (0 "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-R.ttf")
-     (1 "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"))))
+  (case 0
+    (0 '("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
+	 "/usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf"))
+    (1 '("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+	 "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"))))
 
-(defparameter *face-bold*
-  (freetype2:new-face
-   (if t
-       "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
-       "/usr/share/fonts/truetype/ubuntu-font-family/UbuntuMono-B.ttf")))
+(defun power-of-2-ceiling (n)
+  (ash 1 (ceiling (log n 2))))
 
-(defun test78 ()
-  (freetype2:set-char-size *face* (* 8 64) (* 10 64) 96 96)
-  (let ((height (ceiling (print (freetype2::string-pixel-height *face* "█"))))
-	(width (ceiling (print (freetype2::string-pixel-width *face*  "█")))))
-    (print (list width height))
-    (let ((raster-array (make-array (list (* 16 height) (* 16 width) 4)
-				    :element-type '(unsigned-byte 8))))
-      (funland:dobox ((char 0 256))
-	     (multiple-value-bind (array xoffset yoffset)
-		 (toy-string-to-array *face* (string (code-char char)))
-	       (multiple-value-bind (ybase xbase) (floor char 16)
-		 (setf xbase (* xbase width)
-		       ybase (* ybase height))
-		 (incf xbase xoffset)
-		 (incf ybase yoffset)
-		 (destructuring-bind (height width) (array-dimensions array)
-		   (funland:dobox ((y 0 height)
-			   (x 0 width))
-			  (let ((ax (+ x xbase))
-				(ay (+ y ybase))
-				(ans (aref array y x)))
-			    (dotimes (channel 4)
-			      (setf (aref raster-array
-					  ay
-					  ax
-					  channel)
-				    ans))))))))
-      (opticl:write-png-file "/home/imac/quicklisp/local-projects/symmetrical-umbrella/cl-program/src/res/font/achar2.png"
-			     raster-array))))
 
-"ii██"
-"ii██"
-"ii██"
+(defun test78 (&optional (path (second *face*)))
+  (freetype2:with-open-face (face
+			     path)
+    (let ((char-width 0)
+	  ;; (char-height 16)
+	  (last-height nil)
+	  (height 0)
+	  (max-height 16))
+      (flet ((set-size (n)
+	       (freetype2:set-char-size face
+					(* n 64) 0 ;;(* char-height 64)
+					64
+					64
+					)))
+	(block out
+	  (loop
+	     (set-size char-width)
+	     (let ((new-height
+		    (power-of-2-ceiling (ceiling (freetype2::string-pixel-height face "█")))))
+	       (when (> new-height max-height)
+		 (set-size (- char-width 1))
+		 (setf height last-height)
+		 (return-from out))
+	       (incf char-width)
+	       (print char-width)
+	       (setf last-height new-height)))))
+      (let* ((width (power-of-2-ceiling (ceiling (freetype2::string-pixel-width face  "█"))))
+	     (raster-array-height (* 16 height))
+	     (raster-array-width (* 16 width)))
+	(print (list width height))
+	(let ((raster-array (make-array (list raster-array-height
+					      raster-array-width
+					      4)
+					:element-type '(unsigned-byte 8))))
+	  ;;	(print raster-array)
+	  (utility:dobox
+	   ((char 0 256))
+	   (multiple-value-bind (array xoffset yoffset)
+	       (toy-string-to-array face (string (code-char char)))
+	     ;;   (print char)
+	     ;;   (print (list xoffset yoffset array))
+	     (multiple-value-bind (ybase xbase) (floor char 16)
+	       (setf xbase (* xbase width)
+		     ybase (* ybase height))
+	       (incf xbase xoffset)
+	       (incf ybase yoffset)
+	       (destructuring-bind (sub-height sub-width) (array-dimensions array)
+		 (utility::dobox
+		  ((y 0 sub-height)
+		   (x 0 sub-width))
+		  (let ((ax (+ x xbase))
+			(ay (+ y ybase))
+			(ans (aref array y x)))
+		    ;;  (print (list x y))
+		    (if (and (> raster-array-height ay -1)
+			     (> raster-array-width ax -1))
+			(dotimes (channel 4)
+			  (setf (aref raster-array
+				      ay
+				      ax
+				      channel)
+				ans))
+			(print "out of bounds"))))))))
+	  (opticl:write-png-file
+	   "/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/unused/test/font.png"
+	   raster-array))))))
+
+;;"ii██"
+;;"ii██"
+;;"ii██"
 
 
 (defun toy-string-to-array (face string)

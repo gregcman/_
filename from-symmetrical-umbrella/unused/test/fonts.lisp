@@ -8,6 +8,7 @@
   #+nil
   '("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
     "/usr/share/fonts/truetype/ubuntu/UbuntuMono-B.ttf")
+  ;#+nil
   '("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"))
 
@@ -27,41 +28,43 @@
       (values pt height width))))
 
 (defun dump-font ()
-  (apply 'test420 (append *face-path* (list 8))))
+  (apply 'test420 (append *face-path* (list 16 2))))
 
-(defun test420 (regular-path bold-path glyph-height)
+(defun test420 (regular-path bold-path glyph-height target-aspect)
   (setf glyph-height (power-of-2-ceiling glyph-height))
   (with-face (regular-path)
-    (multiple-value-bind (pt height width) (setpt-helper glyph-height)
-      (setf height (power-of-2-ceiling height)
-	    width (* 2 (power-of-2-ceiling width)))
-      (let* ((ratio (/ height width))
+    (multiple-value-bind (pt real-height width) (setpt-helper glyph-height)
+      (setf width (power-of-2-ceiling width))
+      ;;height twice width
+      (let* (
+	     (yscale (print (* (/ width real-height) target-aspect)))
 	     (grid-x 16)
 	     (grid-y 8)
-	     (raster-array (make-array (list (* 2 grid-y height)
+	     (raster-array (make-array (list (* 2 target-aspect grid-y width)
 					     (* 2 grid-x width)
 					     4)
 				       :element-type '(unsigned-byte 8)
 				       :initial-element 0)))
-	(set-size pt ratio)
-	(draw-to-array raster-array grid-x grid-y width height 0 0)
-	(draw-to-array raster-array grid-x grid-y width height grid-x 0)
-	(draw-to-array raster-array grid-x grid-y width height grid-x 0 :underline-p t)
+	(let ((height (* target-aspect width)))
+	  (set-size pt yscale)
+	  (draw-to-array raster-array grid-x grid-y width height 0 0)
+	  (draw-to-array raster-array grid-x grid-y width height grid-x 0)
+	  (draw-to-array raster-array grid-x grid-y width height grid-x 0 :underline-p t)
 
-	(with-face (bold-path)
-	  (set-size pt ratio)
-	  (draw-to-array raster-array grid-x grid-y width height 0 grid-y)
-	  (draw-to-array raster-array grid-x grid-y width height grid-x grid-y)
-	  (draw-to-array raster-array grid-x grid-y width height grid-x grid-y :underline-p t))
-	(opticl:write-png-file
-	 "/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/unused/test/font.png"      	 
-	 raster-array)))))
+	  (with-face (bold-path)
+	    (set-size pt yscale)
+	    (draw-to-array raster-array grid-x grid-y width height 0 grid-y)
+	    (draw-to-array raster-array grid-x grid-y width height grid-x grid-y)
+	    (draw-to-array raster-array grid-x grid-y width height grid-x grid-y :underline-p t))
+	  (opticl:write-png-file
+	   "/home/imac/quicklisp/local-projects/terminal625/from-symmetrical-umbrella/unused/test/font.png"      	 
+	   raster-array))))))
 
 (defun set-size (n scale &optional (face *freetype-face-object*))
   (freetype2:set-char-size face
-			   (* n 64) 0
+			   (* n 64) 0;(floor (* n 64 scale))
 			   64
-			   (* 64 scale)
+			   (floor (* 64 scale))
 			   ))
 
 (defun find-max-width-points (&optional (max-width 16) (face *freetype-face-object*))

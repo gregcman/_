@@ -28,7 +28,7 @@
       (values pt height width))))
 
 (defun dump-font ()
-  (apply 'test420 (append *face-path* (list 12 2))))
+  (apply 'test420 (append *face-path* (list 8 2))))
 
 (defun test420 (regular-path bold-path glyph-height target-aspect)
   (with-face (regular-path)

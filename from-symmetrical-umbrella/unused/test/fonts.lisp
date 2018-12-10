@@ -28,10 +28,9 @@
       (values pt height width))))
 
 (defun dump-font ()
-  (apply 'test420 (append *face-path* (list 16 2))))
+  (apply 'test420 (append *face-path* (list 12 2))))
 
 (defun test420 (regular-path bold-path glyph-height target-aspect)
-  (setf glyph-height (power-of-2-ceiling glyph-height))
   (with-face (regular-path)
     (multiple-value-bind (pt real-height width) (setpt-helper glyph-height)
       (setf width (power-of-2-ceiling width))
@@ -41,8 +40,7 @@
 	     (grid-x 16)
 	     (grid-y 8)
 	     (raster-array (make-array (list (* 2 target-aspect grid-y width)
-					     (* 2 grid-x width)
-					     4)
+					     (* 2 grid-x width))
 				       :element-type '(unsigned-byte 8)
 				       :initial-element 0)))
 	(let ((height (* target-aspect width)))
@@ -132,15 +130,16 @@ fonts are generally taller than they are wide. Return (values pt height)"
 		(ans (aref array y x)))
 	    ;;  (print (list x y))
 	    (if (legit-array-index raster-array ay ax)
-		(dotimes (channel 4)
-		  (setf (aref raster-array
-			      ay
-			      ax
-			      channel)
-			
-			ans
-			;;(- 255 ans)
-			))
+		;;(dotimes (channel 4))
+		(setf (aref raster-array
+			    ay
+			    ax
+			 ;;   channel
+			    )
+		      
+		      ans
+		      ;;(- 255 ans)
+		      )
 		;;	(print "out of bounds")
 		))))))))
 

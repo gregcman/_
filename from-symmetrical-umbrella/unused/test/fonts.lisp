@@ -42,7 +42,7 @@
 	     (raster-array (make-array (list (* 2 target-aspect grid-y width)
 					     (* 2 grid-x width))
 				       :element-type '(unsigned-byte 8)
-				       :initial-element 0)))
+				       :initial-element 255)))
 	(let ((height (* target-aspect width)))
 	  (set-size pt yscale)
 	  (draw-to-array raster-array grid-x grid-y width height 0 0)
@@ -137,7 +137,7 @@ fonts are generally taller than they are wide. Return (values pt height)"
 			 ;;   channel
 			    )
 		      
-		      ans
+		      (- 255 ans)
 		      ;;(- 255 ans)
 		      )
 		;;	(print "out of bounds")

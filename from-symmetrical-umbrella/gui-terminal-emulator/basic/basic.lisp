@@ -15,13 +15,15 @@
 (defun start ()
   (application:main
    (lambda ()
-     (loop
-	(application:poll-app)
-	(if *app*
-	    (testbed::per-frame)
-	    (per-frame))
-	(when (window:skey-j-p (window::keyval #\h))
-	  (toggle *app*))))
+     (let ((text-sub::*text-data-what-type* :framebuffer))
+       (sandbox::with-world-meshing-lparallel
+	 (loop
+	    (application:poll-app)
+	    (if *app*
+		(testbed::per-frame)
+		(per-frame))
+	    (when (window:skey-j-p (window::keyval #\h))
+	      (toggle *app*))))))
    :width (* 80 8)
    :height (* 25 16)
    :title "a basic app"))
@@ -174,8 +176,9 @@
 
 (defun render-tile (char-code x y background-color foreground-color)
   (color (byte/255 char-code)
+	 (byte/255 foreground-color)
 	 (byte/255 background-color)
-	 (byte/255 foreground-color))
+	 (byte/255 (text-sub::char-attribute nil nil t)))
   (vertex
    (floatify x)
    (floatify y)))
@@ -303,7 +306,7 @@
      '((value-out . value))
      :uniforms
      '()))
-  (deflazy flat-shader (flat-shader-source gl-context)
+  (glhelp::deflazy-gl flat-shader (flat-shader-source)
     (glhelp::create-gl-program flat-shader-source)))
 
 (progn
@@ -344,14 +347,14 @@
        (tex-out . tex))
      :uniforms
      '((sampler (:fragment-shader sampler)))))
-  (deflazy flat-texture-shader (flat-texture-shader-source gl-context)
+  (glhelp::deflazy-gl flat-texture-shader (flat-texture-shader-source)
     (glhelp::create-gl-program flat-texture-shader-source)))
 
 (deflazy cons-png ()
   (image-utility:read-png-file
    (utility:rebase-path #P"cons-cell.png" *this-directory*)
    t))
-(deflazy cons-texture (cons-png gl-context)
+(glhelp::deflazy-gl cons-texture (cons-png)
   (make-instance
    'glhelp::gl-texture
    :handle
@@ -410,8 +413,8 @@
 	    (render-tile count x y count (- 255 count))
 	    (incf count))))
       (let ((bgcol (byte/255
-		    15
-		    ;(text-sub::color-rgba 3 3 3 3)
+		    ;;15
+		    (text-sub::color-rgba 3 3 3 00)
 		    ))
 	    (fgcol (byte/255
 		    0
@@ -450,9 +453,9 @@
        nil)   
       (glhelp::bind-default-framebuffer)
       (glhelp:set-render-area 0 0 (getfnc 'application::w) (getfnc 'application::h))
-      (gl:enable :blend)
+       ;;(gl:enable :blend)
       (gl:blend-func :src-alpha :one-minus-src-alpha)
-      (gl:call-list (glhelp::handle (getfnc 'text-sub::fullscreen-quad))))))
+      (text-sub::draw-fullscreen-quad))))
 
 
 ;;;terminal emulation
@@ -461,7 +464,8 @@
     (terminal-test::do-term-values (glyph col row)
       (let ((char (3bst:c glyph))
 	    (bg (3bst:bg glyph))
-	    (fg (3bst:fg glyph)))
+	    (fg (3bst:fg glyph))
+	    )
 	(when (and (= cx col)
 		   (= cy row))
 	  (rotatef bg fg))

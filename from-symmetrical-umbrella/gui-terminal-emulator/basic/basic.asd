@@ -10,7 +10,8 @@
 	       #:uncommon-lisp
 	       #:testbed
 	       #:quads
-	       #:point)
+	       #:point
+	       #:music)
   :serial t
   :components 
   ((:file "basic")))

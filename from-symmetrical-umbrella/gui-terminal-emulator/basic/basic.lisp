@@ -112,33 +112,33 @@
   (let ((mousex *ndc-mouse-x*)
 	(mousey *ndc-mouse-y*))
     (let ((program (getfnc 'flat-texture-shader)))
-    (glhelp::use-gl-program program)
-    (glhelp:with-uniforms uniform program
-      (gl:uniformi (uniform 'sampler) 0)
-      (glhelp::set-active-texture 0))
+      (glhelp::use-gl-program program)
+      (glhelp:with-uniforms uniform program
+	(gl:uniformi (uniform 'sampler) 0)
+	(glhelp::set-active-texture 0))
 
-    #+nil
-    (when (window::skey-p (window::mouseval :1))
-      (deflazy cons-png ()
-	(image-utility:flip-image
-	 (color-test::test42 (floatify window::*scroll-y*)
+      #+nil
+      (when (window::skey-p (window::mouseval :1))
+	(deflazy cons-png ()
+	  (image-utility:flip-image
+	   (color-test::test42 (floatify window::*scroll-y*)
 					;	   (+ 0.5 (* 0.1 (sin *ticks*)))
-			     (/ (+ 1 mousex) 2)
+			       (/ (+ 1 mousex) 2)
 					;	   (+ 0.5 (* 0.1 (cos *ticks*)))
-			     (/ (+ 1 mousey) 2)
-			     )))
+			       (/ (+ 1 mousey) 2)
+			       )))
 					;(sleep 0.1)
-      )
-    #+nil
-    (render-sprite
-     (load-time-value
-      (make-instance
-       'sprite
-       :texture 'cons-texture
-       :position (make-instance 'point :x -1.0 :y -1.0)
-       :bounding-box (make-instance 'rectangle
-				    :x0 0.0 :y0 0.0
-				    :x1 2.0 :y1 2.0)))))
+	)
+      #+nil
+      (render-sprite
+       (load-time-value
+	(make-instance
+	 'sprite
+	 :texture 'cons-texture
+	 :position (make-instance 'point :x -1.0 :y -1.0)
+	 :bounding-box (make-instance 'rectangle
+				      :x0 0.0 :y0 0.0
+				      :x1 2.0 :y1 2.0)))))
     
 					;    #+nil
     (when (window::skey-j-p (window::mouseval :left))

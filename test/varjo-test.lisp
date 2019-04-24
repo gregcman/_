@@ -9,19 +9,21 @@
 (defparameter *keyword-package* (find-package "KEYWORD"))
 
 (defparameter *bar*
-  nil
-  #+nil
+  ;nil
+  ;#+nil
   '((values (vec4 b b b b)
      (swizzle (vec4 b b b b)
       :rgba))))
 
 (defpackage :varjo-shader
-  (:use :vari :cl :shadow))
+  (:use :vari :cl;; :shadow
+	))
 
 (defun intern-for-varjo (&optional (tree *bar*)
 			   (package (find-package "VARJO-SHADER")))
   (let ((packages-which-use-vari (package-used-by-list :vari))
-	(shadow-package (find-package "SHADOW")))
+	;(shadow-package (find-package "SHADOW"))
+	)
     (let (stack)
       (block out
 	(labels ((rec (tree)
@@ -37,12 +39,13 @@
 			(symbol
 			 (if (or (keywordp x)
 				 (let ((symbol-package (symbol-package x)))
-				   (or
-				    (find
-				     symbol-package
-				     packages-which-use-vari)
-				    (eq symbol-package
-					shadow-package))))
+				   ;;(or)
+				   (find
+				    symbol-package
+				    packages-which-use-vari)
+				   #+nil
+				   (eq symbol-package
+				       shadow-package)))
 			     x
 			     (intern (symbol-name x)
 				     package)))
@@ -60,15 +63,18 @@
      ,@body))
 
 (defparameter *foo*
-  (list
-   (varjo:make-stage :vertex '((b :float))
-		     nil
-		     '(:140)
-		     (variables::intern-for-varjo variables::*bar*))
-   (varjo:make-stage :fragment '((g :vec4))
-		     nil
-		     '(:140)
-		     '(g))))
+  (let ((version '(:140)))
+    (list
+     (varjo:make-stage :vertex (variables::intern-for-varjo '((b :float "FOOBAR")))
+		       nil
+		       version
+		       (variables::intern-for-varjo variables::*bar*))
+     (varjo:make-stage :fragment (variables::intern-for-varjo '((g :vec4)))
+		       nil
+		       version
+		       (variables::intern-for-varjo '(g))))))
+
+(defun )
 (let ((uniforms-var (gensym)))
     `(let ((,uniforms-var (gl-program-object-uniforms ,program-object)))
        (macrolet ((,name (id)
@@ -100,12 +106,12 @@
     (:fragment (foo-frag :vec4))))
 
 (defpackage :varjo-compile
-  (:use :varjo :cl :shadow))
+  (:use :varjo :cl))
 (in-package :varjo-compile)
 
 (defun dump-glsl ()
   (let ((obj (varjo:rolling-translate
-	      varjo-shader::*foo*)))
+	      variables::*foo*)))
     (values obj
 	    (varjo:glsl-code
 	     obj))))

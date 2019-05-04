@@ -12,31 +12,40 @@
   (defparameter *chunk-size-y* 16)
   (defparameter *chunk-size-z* 16))
 
-;;(struct-to-clos:struct->class)
-#+nil
-(defstruct chunk
-  x
-  y
-  z
-  data)
+(struct-to-clos:struct->class
+ (defstruct chunk
+   x
+   y
+   z
+   key
+   data))
 
-(defun make-chunk (&key data &allow-other-keys)
-  data)
-(declaim (inline chunk-data))
-(defun chunk-data (chunk)
-  chunk)
+#+nil ;;test to see what happens if chunk is just an array, and nothing else
+(progn
+  (defun make-chunk (&key data &allow-other-keys)
+    data)
+  (declaim (inline chunk-data))
+  (defun chunk-data (chunk)
+    chunk))
 
+;;FIXME::chunk-coord and block-coord being fixnums is not theoretically correct,
+;;but its still a lot of space?
 (deftype chunk-coord () 'fixnum)
 (deftype chunk-data () `(simple-array t (,*chunk-size-x* ,*chunk-size-y* ,*chunk-size-z*)))
 (deftype inner-chunk-coord-x () `(integer 0 ,*chunk-size-x*))
 (deftype inner-chunk-coord-y () `(integer 0 ,*chunk-size-y*))
 (deftype inner-chunk-coord-z () `(integer 0 ,*chunk-size-z*))
 (deftype block-coord () 'fixnum)
+(defun create-chunk-key (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
+  ;;in order to be correct, the key has to store each value unaltered
+  ;;This is for creating a key for a hash table
+  (list chunk-x chunk-y chunk-z))
 (defun create-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
   (declare (type chunk-coord chunk-x chunk-y chunk-z))
   (make-chunk :x chunk-x
 	      :y chunk-y
 	      :z chunk-z
+	      :key (create-chunk-key chunk-x chunk-y chunk-z)
 	      :data (make-array (list *chunk-size-x* *chunk-size-y* *chunk-size-z*)
 				:initial-element nil)))
   ;;equal is used because the key is a list of the chunk coordinates
@@ -97,7 +106,7 @@
 
     (defun get-chunk (&optional (chunk-x 0) (chunk-y 0) (chunk-z 0))
       (declare (type chunk-coord chunk-x chunk-y chunk-z))
-      (let ((key (list chunk-x chunk-y chunk-z)))
+      (let ((key (create-chunk-key chunk-x chunk-y chunk-z)))
 	(multiple-value-bind (value existsp) (gethash key *chunks*)
 	  (if existsp
 	      (values value t)
@@ -169,7 +178,7 @@
       (or (get-chunk-from-chunk-array chunk-x chunk-y chunk-z)
 	  (get-chunk chunk-x chunk-y chunk-z)))
     
-    (defun meh (&optional (x 0) (y 0) (z 0))
+    (defun getobj (&optional (x 0) (y 0) (z 0))
       (declare (type block-coord x y z))
       (let ((chunk-x (floor x (utility:etouq *chunk-size-x*)))
 	    (chunk-y (floor y (utility:etouq *chunk-size-y*)))
@@ -179,7 +188,7 @@
 	      (inner-y (mod y (utility:etouq *chunk-size-y*)))
 	      (inner-z (mod z (utility:etouq *chunk-size-z*))))
 	  (reference-inside-chunk chunk inner-x inner-y inner-z))))
-    (defun (setf meh) (value &optional (x 0) (y 0) (z 0))
+    (defun (setf getobj) (value &optional (x 0) (y 0) (z 0))
       (declare (type block-coord x y z))
       (let ((chunk-x (floor x (utility:etouq *chunk-size-x*)))
 	    (chunk-y (floor y (utility:etouq *chunk-size-y*)))
@@ -188,7 +197,10 @@
 	      (inner-x (mod x (utility:etouq *chunk-size-x*)))
 	      (inner-y (mod y (utility:etouq *chunk-size-y*)))
 	      (inner-z (mod z (utility:etouq *chunk-size-z*))))
-	  (setf (reference-inside-chunk chunk inner-x inner-y inner-z) value))))))
+	  (setf (reference-inside-chunk chunk inner-x inner-y inner-z) value))))
+    ;;FIXME::setobj is provided for backwards compatibility?
+    (defun setobj (x y z new)
+      (setf (getobj x y z) new))))
 
 
 (defun test ()
@@ -198,3 +210,10 @@
   (let ((times (expt 10 6)))
     (time (dotimes (x times) (meh 0 0 0)))
     (time (dotimes (x times) (world::getobj 0 0 0)))))
+
+;;For backwards compatibility
+(defun unhashfunc (chunk-key)
+  (destructuring-bind (x y z) chunk-key
+    (values x y z)))
+(defun chunkhashfunc (x y z)
+  (create-chunk-key x y z))

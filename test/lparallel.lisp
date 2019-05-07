@@ -32,10 +32,17 @@
    ;;:killed = killed from a separate thread
    ;;:completed = finished normally
    (lock (bordeaux-threads:make-recursive-lock))
-   return-values))
+   return-values
+   (return-status t)
+   ;;return-status is an error object when status is :aborted,
+   ;;otherwise it is t
+   ))
 
 (defmethod print-object ((object job-task) stream)
-  (format stream "<job-task ~s ~s>" (job-task-status object) (job-task-return-values object)))
+  (format stream "<job-task ~s ~s ~s>"
+	  (job-task-status object)
+	  (job-task-return-values object)
+	  (job-task-return-status object)))
 (defun init-job-task (job-task)
   ;;return t if correctly initialized
   ;;otherwise return nil. Should return nil if the task was killed beforehand
@@ -51,27 +58,37 @@
     (setf (job-task-return-values job-task) returned-values)
     (setf (job-task-status job-task) :complete)
     (setf (job-task-thread job-task) nil)))
-(defun abort-job-task (job-task)
+(defun abort-job-task (job-task error)
   (with-locked-job-task (job-task)
+    (setf (job-task-return-status job-task) error)
     (setf (job-task-status job-task) :aborted)
     (setf (job-task-thread job-task) nil)))
 
 (defmacro with-locked-job-task ((job-task) &body body)
   `(bordeaux-threads:with-recursive-lock-held ((job-task-lock ,job-task))
      ,@body))
+(defun set-job-task-vars-killed (job-task)
+  (with-locked-job-task (job-task)
+    (setf (job-task-thread job-task) nil)
+    (setf (job-task-status job-task) :killed)))
 (defun kill-job-task (job-task)
   (with-locked-job-task (job-task)
     (let ((status (job-task-status job-task)))
       (when
 	  ;;only kill job-tasks that are in the middle of processing, or pending
 	  (member status '(:pending :running))
-	(when (eq status :running)
-	  ;;kill a task that has been started
-	  (bordeaux-threads:destroy-thread (job-task-thread job-task)))
-	(setf (job-task-thread job-task) nil)
-	;;(lparallel:kill-tasks job-task)
-	(setf (job-task-status job-task) :killed)
-	(lparallel.queue:push-queue job-task *finished-task-queue*))))
+	(let (;;set-job-task-vars removes the thread from the object, so save it to 'thread
+	      (thread (job-task-thread job-task)))
+	  (set-job-task-vars-killed job-task)
+	  ;;FIXME::use bordeaux threads and kill the thread directly or use lparallel:kill-tasks?
+	  ;;(lparallel:kill-tasks job-task)
+	  (when (eq status :running)
+	    ;;kill a task that has been started
+	    (bordeaux-threads:destroy-thread thread)))
+	;;we do not push to the *finished-task-queue*, because if the task is pending but running,
+	;;then it will appear twice. Instead, the killed task is pushed onto the queue
+	;;with task-handler-bind
+	)))
   job-task)
 
 (defun job-task-function (job-task fun args)
@@ -82,8 +99,8 @@
       (error (c)
 	;;handle regular errors from function
 	(declare (ignorable c))
-	(debugging (print c))
-	(abort-job-task job-task))))
+	;;(debugging (print c))
+	(abort-job-task job-task c))))
   job-task)
 (defun submit (fun &rest args)
   (let ((new-job-task (make-job-task :status :pending)))
@@ -110,26 +127,35 @@
   ;;tasks to the *finished-task-queue*
   (let ((queue *finished-task-queue*))
     (lparallel.queue:with-locked-queue queue
-      (loop
-	 (multiple-value-bind (value exist-p) (lparallel:try-receive-result *channel*)
-	   (unless exist-p
-	     (return))
-	   (when (typep value 'job-task))
-	   (lparallel.queue:push-queue/no-lock value queue))))))
+      (loop :named outer-loop :do
+	 (handler-case 
+	     (loop
+		(multiple-value-bind (value exist-p)
+		    (lparallel:try-receive-result *channel*)
+		  (unless exist-p
+		    (return-from outer-loop))
+		  (when (typep value 'job-task))
+		  (lparallel.queue:push-queue/no-lock value queue)))
+	   (error (c)
+	     (declare (ignorable c))
+	     (print c)))))))
 
 (defun get-values (&optional (fun 'print))
   (%get-values)
   (let ((queue *finished-task-queue*))
     (lparallel.queue:with-locked-queue queue
-      (loop
+      (loop :named loop :do
 	 (multiple-value-bind (value exist-p) (lparallel.queue:try-pop-queue/no-lock queue)
 	   (unless exist-p
-	     (return))
+	     (return-from loop))
 	   (funcall fun value))))))
 
 (defun test ()
   (dotimes (x 10)
     (submit (lambda () (error "fuck you")))))
+(defun test2 ()
+  (dotimes (x 10)
+    (submit (lambda () (random 100)))))
 (defun test-loop ()
   (let ((task (submit (lambda () (loop)))))
     (sleep 1)

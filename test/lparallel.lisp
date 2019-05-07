@@ -6,7 +6,8 @@
   (progn
     (ql:quickload :lparallel)
     (ql:quickload :cl-cpus)
-    (ql:quickload :uncommon-lisp)))
+    (ql:quickload :uncommon-lisp)
+    (ql:quickload :alexandria)))
 
 (defparameter *channel* nil)
 (defparameter *finished-task-queue* nil)
@@ -42,8 +43,15 @@
    (return-status t)
    ;;When the task is :pending, or :started, its nil
    ;;when the task is :aborted, :killed, :complete, its t
-   (finished nil)))
-
+   (finished nil)
+   ;;Set to either nil, or a function-designator of type (function (job-task))
+   ;;Called when read by finished-job-tasks
+   callback
+   ;;user-defined data
+   data))
+(defmacro with-locked-job-task ((job-task) &body body)
+  `(bordeaux-threads:with-recursive-lock-held ((job-task-lock ,job-task))
+     ,@body))
 (defmethod print-object ((object job-task) stream)
   (format stream "<job-task ~s ~s ~s ~s>"
 	  (if (job-task-finished object)
@@ -75,9 +83,6 @@
     (setf (job-task-thread job-task) nil)
     (setf (job-task-finished job-task) t)))
 
-(defmacro with-locked-job-task ((job-task) &body body)
-  `(bordeaux-threads:with-recursive-lock-held ((job-task-lock ,job-task))
-     ,@body))
 (defun kill-job-task (job-task)
   (with-locked-job-task (job-task)
     (let ((status (job-task-status job-task)))
@@ -114,11 +119,11 @@
 	;;(debugging (print c))
 	(abort-job-task job-task c))))
   job-task)
-(defmacro submit-body (&body body)
-  `(submit (lambda () ,@body)))
+(defmacro submit-body ((&rest rest &key &allow-other-keys) &body body)
+  `(submit (lambda () ,@body) ,@rest))
 
-(defun submit (fun &rest args)
-  (let ((new-job-task (make-job-task :status :pending)))
+(defun submit (fun &key callback args data)
+  (let ((new-job-task (make-job-task :status :pending :callback callback :data data)))
     (let ((lparallel:*task-category* new-job-task))
       (lparallel:submit-task
        *channel*
@@ -158,6 +163,33 @@
 	     (return-from loop))
 	   (funcall fun value))))))
 
+(defun flush-job-tasks (&optional fun)
+  (get-values (lambda (job-task)
+		(when fun
+		  (funcall fun job-task))
+		(let ((callback (job-task-callback job-task)))
+		  (when callback
+		    (funcall callback job-task))))))
+
+(defparameter *unique-tasks* (make-hash-table :test 'equal))
+(defparameter *unique-tasks-lock* (bordeaux-threads:make-recursive-lock))
+(defmacro submit-unique-task (key (fun &rest rest &key &allow-other-keys))
+  ;;fun, callback, args are only evaluated if
+  ;;the task is non-existent
+  (alexandria:once-only (key)
+    (alexandria:with-gensyms (value existsp job-task)
+      `(bordeaux-threads:with-recursive-lock-held (*unique-tasks-lock*)
+	 (multiple-value-bind (,value ,existsp) (gethash ,key *unique-tasks*)
+	   (declare (ignorable ,value))
+	   (if (not ,existsp)
+	       (let ((,job-task (submit ,fun ,@rest)))
+		 (setf (gethash ,key *unique-tasks*) ,job-task)
+		 (values ,job-task t))
+	       (values nil nil)))))))
+(defun remove-unique-task-key (key)
+  (bordeaux-threads:with-recursive-lock-held (*unique-tasks-lock*)
+    (remhash key *unique-tasks*)))
+
 ;;;;tests
 (defun test23 ()
   (restart-case
@@ -177,3 +209,20 @@
   (let ((task (submit (lambda () (loop)))))
     (sleep 0.2)
     (kill-job-task task)))
+
+(defun test-unique ()
+  (dotimes (x 10)
+    (dotimes (x 10)
+      (let ((x x))
+	(submit-unique-task x ((lambda (n)
+				 (dotimes (x 10)
+				   (sleep 0.1)
+				   (print n)))
+			       :args (list x)
+			       :callback (lambda (job-task)
+					   (declare (ignorable job-task))
+					   (print 34234)
+					   (remove-unique-task-key (job-task-data job-task)))
+			       :data x))))))
+(defun test-flush-job-tasks ()
+  (flush-job-tasks 'print))

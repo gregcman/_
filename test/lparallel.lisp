@@ -35,6 +35,7 @@
    return-values
    (return-status t)
    ;;return-status is an error object when status is :aborted,
+   ;;when status is :killed, it is nil
    ;;otherwise it is t
    ))
 
@@ -67,10 +68,6 @@
 (defmacro with-locked-job-task ((job-task) &body body)
   `(bordeaux-threads:with-recursive-lock-held ((job-task-lock ,job-task))
      ,@body))
-(defun set-job-task-vars-killed (job-task)
-  (with-locked-job-task (job-task)
-    (setf (job-task-thread job-task) nil)
-    (setf (job-task-status job-task) :killed)))
 (defun kill-job-task (job-task)
   (with-locked-job-task (job-task)
     (let ((status (job-task-status job-task)))
@@ -79,16 +76,20 @@
 	  (member status '(:pending :running))
 	(let (;;set-job-task-vars removes the thread from the object, so save it to 'thread
 	      (thread (job-task-thread job-task)))
-	  (set-job-task-vars-killed job-task)
+	  (setf (job-task-thread job-task) nil)
+	  (setf (job-task-status job-task) :killed)
+	  (setf (job-task-return-status job-task) nil)
 	  ;;FIXME::use bordeaux threads and kill the thread directly or use lparallel:kill-tasks?
 	  ;;(lparallel:kill-tasks job-task)
 	  (when (eq status :running)
 	    ;;kill a task that has been started
 	    (bordeaux-threads:destroy-thread thread)))
-	;;we do not push to the *finished-task-queue*, because if the task is pending but running,
-	;;then it will appear twice. Instead, the killed task is pushed onto the queue
-	;;with task-handler-bind
-	)))
+	;;we push to the *finished-task-queue*, because otherwise lparallel does not
+	;;let us know about killed task objects
+	;;FIXME::This means tasks killed with kill-tasks or bordeaux-threads:destroy-thread
+	;;will not be registered correctly, the job-task object will still say :pending/:running
+	;;and contain the dead thread.
+	(lparallel.queue:push-queue/no-lock job-task *finished-task-queue*))))
   job-task)
 
 (defun job-task-function (job-task fun args)
@@ -138,7 +139,8 @@
 		  (lparallel.queue:push-queue/no-lock value queue)))
 	   (error (c)
 	     (declare (ignorable c))
-	     (print c)))))))
+	     ;;(print c)
+	     ))))))
 
 (defun get-values (&optional (fun 'print))
   (%get-values)
@@ -158,5 +160,5 @@
     (submit (lambda () (random 100)))))
 (defun test-loop ()
   (let ((task (submit (lambda () (loop)))))
-    (sleep 1)
+    (sleep 0.2)
     (kill-job-task task)))

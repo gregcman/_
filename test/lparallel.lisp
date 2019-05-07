@@ -124,13 +124,12 @@
 
 (defun submit (fun &key callback args data)
   (let ((new-job-task (make-job-task :status :pending :callback callback :data data)))
-    (let ((lparallel:*task-category* new-job-task))
-      (lparallel:submit-task
-       *channel*
-       'job-task-function
-       new-job-task
-       fun
-       args))
+    (lparallel:submit-task
+     *channel*
+     'job-task-function
+     new-job-task
+     fun
+     args)
     new-job-task))
 
 (defun %get-values ()

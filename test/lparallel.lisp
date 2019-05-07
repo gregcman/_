@@ -114,6 +114,9 @@
 	;;(debugging (print c))
 	(abort-job-task job-task c))))
   job-task)
+(defmacro submit-body (&body body)
+  `(submit (lambda () ,@body)))
+
 (defun submit (fun &rest args)
   (let ((new-job-task (make-job-task :status :pending)))
     (let ((lparallel:*task-category* new-job-task))
@@ -124,14 +127,6 @@
        fun
        args))
     new-job-task))
-
-(defun test23 ()
-  (restart-case
-      (handler-bind ((error #'(lambda (c)
-				(declare (ignore c))
-				(invoke-restart 'my-restart 7))))
-	(error "Foo."))
-    (my-restart (&optional v) v)))
 
 (defun %get-values ()
   ;;receives values from the *channel* which can be either task objects
@@ -162,6 +157,15 @@
 	   (unless exist-p
 	     (return-from loop))
 	   (funcall fun value))))))
+
+;;;;tests
+(defun test23 ()
+  (restart-case
+      (handler-bind ((error #'(lambda (c)
+				(declare (ignore c))
+				(invoke-restart 'my-restart 7))))
+	(error "Foo."))
+    (my-restart (&optional v) v)))
 
 (defun test ()
   (dotimes (x 10)

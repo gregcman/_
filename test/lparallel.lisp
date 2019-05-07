@@ -23,24 +23,32 @@
 
 (struct-to-clos:struct->class 
  (defstruct job-task
+   ;;the thread it runs in 
    thread
-   status
    ;;status is one of :pending, :started, :complete, :aborted, :killed
    ;;:pending -> created, not run yet
    ;;:running = in the process of running
    ;;:aborted = aborted from the running function
    ;;:killed = killed from a separate thread
    ;;:completed = finished normally
+   status
+   ;;Turn on the lock with 'with-locked-job-task while modifiying this task's values
    (lock (bordeaux-threads:make-recursive-lock))
+   ;;The values captured by the submit-ed function. multiple-values-list
    return-values
-   (return-status t)
    ;;return-status is an error object when status is :aborted,
    ;;when status is :killed, it is nil
    ;;otherwise it is t
-   ))
+   (return-status t)
+   ;;When the task is :pending, or :started, its nil
+   ;;when the task is :aborted, :killed, :complete, its t
+   (finished nil)))
 
 (defmethod print-object ((object job-task) stream)
-  (format stream "<job-task ~s ~s ~s>"
+  (format stream "<job-task ~s ~s ~s ~s>"
+	  (if (job-task-finished object)
+	      :dead
+	      :live)
 	  (job-task-status object)
 	  (job-task-return-values object)
 	  (job-task-return-status object)))
@@ -58,12 +66,14 @@
   (with-locked-job-task (job-task)
     (setf (job-task-return-values job-task) returned-values)
     (setf (job-task-status job-task) :complete)
-    (setf (job-task-thread job-task) nil)))
+    (setf (job-task-thread job-task) nil)
+    (setf (job-task-finished job-task) t)))
 (defun abort-job-task (job-task error)
   (with-locked-job-task (job-task)
     (setf (job-task-return-status job-task) error)
     (setf (job-task-status job-task) :aborted)
-    (setf (job-task-thread job-task) nil)))
+    (setf (job-task-thread job-task) nil)
+    (setf (job-task-finished job-task) t)))
 
 (defmacro with-locked-job-task ((job-task) &body body)
   `(bordeaux-threads:with-recursive-lock-held ((job-task-lock ,job-task))
@@ -79,6 +89,7 @@
 	  (setf (job-task-thread job-task) nil)
 	  (setf (job-task-status job-task) :killed)
 	  (setf (job-task-return-status job-task) nil)
+	  (setf (job-task-finished job-task) t)
 	  ;;FIXME::use bordeaux threads and kill the thread directly or use lparallel:kill-tasks?
 	  ;;(lparallel:kill-tasks job-task)
 	  (when (eq status :running)
